@@ -18,7 +18,10 @@ const ItemExit = {
 const systray = new SysTray({
   menu: {
     tooltip: "Steam Clip Auto Exporter",
-    icon: Deno.build.os === "windows" ? "./icon.ico" : "./icon.png",
+    icon: path.join(
+      import.meta.dirname ?? ".",
+      Deno.build.os === "windows" ? "icon.ico" : "icon.png",
+    ),
     isTemplateIcon: Deno.build.os === "darwin",
     title: "Steam Clip Auto Exporter",
     items: [

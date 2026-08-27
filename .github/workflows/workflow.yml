@@ -26,10 +26,10 @@ jobs:
         run: deno lint
 
       - name: Compile for Linux
-        run: deno compile --allow-all -o steam-clip-auto-exporter index.ts
+        run: deno compile --allow-all --include icon.ico --include icon.png -o steam-clip-auto-exporter index.ts
 
       - name: Compile for Windows
-        run: deno compile --allow-all -o steam-clip-auto-exporter.exe --target x86_64-pc-windows-msvc index.ts
+        run: deno compile --allow-all --include icon.ico --include icon.png -o steam-clip-auto-exporter.exe --target x86_64-pc-windows-msvc index.ts
 
       - name: Upload binaries
         run: gh release upload ${{github.event.release.tag_name}} steam-clip-auto-exporter steam-clip-auto-exporter.exe

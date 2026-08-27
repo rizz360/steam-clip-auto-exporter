@@ -2,3 +2,4 @@
 config.json
 steam-clip-auto-exporter.*
 /bin/
+dist/

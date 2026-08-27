@@ -2,7 +2,11 @@ import * as path from "@std/path";
 import { exec } from "node:child_process";
 import config from "./config.ts";
 
-import { fileExists, writeCorrectedMpdFile } from "./fileUtilities.ts";
+import {
+  fileExists,
+  sanitizeFileName,
+  writeCorrectedMpdFile,
+} from "./fileUtilities.ts";
 
 const clipNameRegex = /clip_\d+_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/;
 const clipDestinationPattern = "$1-$2-$3 $4-$5-$6";
@@ -57,7 +61,9 @@ export async function exportSingleEntry(
   for (const clipPath of Deno.readDirSync(videoPath)) {
     const inputDirectory = path.join(videoPath, clipPath.name);
 
-    const appName = await getAppName(clipPath.name.split("_")[1]);
+    const appName = sanitizeFileName(
+      await getAppName(clipPath.name.split("_")[1]),
+    );
     const outputFileName = clipName.replace(
       clipNameRegex,
       `${appName} ${clipDestinationPattern}.mp4`,
