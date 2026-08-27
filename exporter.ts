@@ -68,7 +68,10 @@ export async function exportSingleEntry(
       clipNameRegex,
       `${appName} ${clipDestinationPattern}.mp4`,
     );
-    const outputFile = path.join(config.outputPath, outputFileName);
+    const outputDir = config.groupClipsByGame
+      ? path.join(config.outputPath, appName)
+      : config.outputPath;
+    const outputFile = path.join(outputDir, outputFileName);
     if (await fileExists(outputFile)) {
       console.log(`Skipping ${inputDirectory}. Already exported`);
       continue;
@@ -77,6 +80,7 @@ export async function exportSingleEntry(
 
     console.log(`Exporting ${inputDirectory} to ${outputFile}`);
 
+    await Deno.mkdir(outputDir, { recursive: true });
     await exec(
       `ffmpeg -i "${inputFile}" -c copy "${outputFile}"`,
     );
