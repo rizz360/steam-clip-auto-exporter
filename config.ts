@@ -10,6 +10,7 @@ if (!await fileExists(configPath)) {
       {
         steamInstallPath: "C:\\Program Files (x86)\\Steam",
         outputPath: "C:\\Users\\YOUR_USER\\Videos",
+        groupClipsByGame: false,
       },
       null,
       2,
@@ -47,4 +48,7 @@ const clipPaths = Deno.readDirSync(userDataPath).toArray().map((
 export default {
   clipPaths: clipPaths,
   outputPath: configObject.outputPath,
+  // Optional: nest exported clips under a per-game subfolder
+  // (<outputPath>/<Game Name>/...) instead of a flat directory.
+  groupClipsByGame: configObject.groupClipsByGame ?? false,
 };

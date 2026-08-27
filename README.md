@@ -15,3 +15,11 @@ So this does exactly that (using ffmpeg).
 4. Profit
 
 Now all your clips will be exported as .mp4 files to the specified folder.
+
+## Config options
+
+- `steamInstallPath`: Path to your Steam installation.
+- `outputPath`: Folder clips get exported to.
+- `groupClipsByGame` (optional, default `false`): When `true`, clips are
+  nested under a subfolder per game (`<outputPath>/<Game Name>/...`)
+  instead of all being placed directly in `outputPath`.
