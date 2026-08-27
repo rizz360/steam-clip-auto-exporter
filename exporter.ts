@@ -1,5 +1,4 @@
 import * as path from "@std/path";
-import { exec } from "node:child_process";
 import config from "./config.ts";
 
 import {
@@ -45,6 +44,77 @@ async function getAppName(appId: string): Promise<string> {
   return name;
 }
 
+function parseClipDate(clipName: string): Date | null {
+  const match = clipNameRegex.exec(clipName);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  // Clip filenames encode local wall-clock time, no timezone info.
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+}
+
+async function runFfmpeg(
+  inputFile: string,
+  outputFile: string,
+): Promise<void> {
+  const command = new Deno.Command("ffmpeg", {
+    args: ["-i", inputFile, "-c", "copy", outputFile],
+    stdout: "null",
+    stderr: "piped",
+  });
+  const { code, stderr } = await command.output();
+  if (code !== 0) {
+    throw new Error(
+      `ffmpeg exited with code ${code}: ${new TextDecoder().decode(stderr)}`,
+    );
+  }
+}
+
+// Sets the exported file's modified/accessed time (all platforms) and, on
+// Windows, its creation time too, to match when the clip was actually
+// recorded rather than when it was exported.
+async function applyClipTimestamp(
+  outputFile: string,
+  clipDate: Date,
+): Promise<void> {
+  try {
+    await Deno.utime(outputFile, clipDate, clipDate);
+    if (Deno.build.os === "windows") {
+      const command = new Deno.Command("powershell", {
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "(Get-Item -LiteralPath $env:CLIP_OUTPUT_FILE).CreationTimeUtc = " +
+          "[datetime]$env:CLIP_DATE",
+        ],
+        env: {
+          CLIP_OUTPUT_FILE: outputFile,
+          CLIP_DATE: clipDate.toISOString(),
+        },
+        stdout: "null",
+        stderr: "piped",
+      });
+      const { code, stderr } = await command.output();
+      if (code !== 0) {
+        throw new Error(
+          `powershell exited with code ${code}: ${
+            new TextDecoder().decode(stderr)
+          }`,
+        );
+      }
+    }
+  } catch (err) {
+    console.warn(`Failed to set clip date on ${outputFile}:`, err);
+  }
+}
+
 export async function exportAll() {
   for (const clipsPath of config.clipPaths) {
     for (const clipWrapperPath of Deno.readDirSync(clipsPath)) {
@@ -72,8 +142,10 @@ export async function exportSingleEntry(
       ? path.join(config.outputPath, appName)
       : config.outputPath;
     const outputFile = path.join(outputDir, outputFileName);
+    const clipDate = parseClipDate(clipName);
     if (await fileExists(outputFile)) {
       console.log(`Skipping ${inputDirectory}. Already exported`);
+      if (clipDate) await applyClipTimestamp(outputFile, clipDate);
       continue;
     }
     const inputFile = await writeCorrectedMpdFile(inputDirectory);
@@ -81,9 +153,8 @@ export async function exportSingleEntry(
     console.log(`Exporting ${inputDirectory} to ${outputFile}`);
 
     await Deno.mkdir(outputDir, { recursive: true });
-    await exec(
-      `ffmpeg -i "${inputFile}" -c copy "${outputFile}"`,
-    );
+    await runFfmpeg(inputFile, outputFile);
+    if (clipDate) await applyClipTimestamp(outputFile, clipDate);
     return;
   }
 }
