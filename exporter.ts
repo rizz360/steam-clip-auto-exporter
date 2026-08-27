@@ -7,17 +7,39 @@ import { fileExists, writeCorrectedMpdFile } from "./fileUtilities.ts";
 const clipNameRegex = /clip_\d+_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/;
 const clipDestinationPattern = "$1-$2-$3 $4-$5-$6";
 
-const appIds = await fetch(
-  "https://api.steampowered.com/ISteamApps/GetAppList/v2",
-)
-  .then((res) => res.json())
-  .then((res) =>
-    Object.fromEntries(
-      res.applist.apps.map((
-        app: { appid: number; name: string },
-      ) => [app.appid, app.name]),
-    )
-  );
+// ISteamApps/GetAppList (the old bulk endpoint) was deprecated by Valve, so
+// app names are now resolved one appid at a time via the Store API and cached.
+const appNameCache = new Map<string, string>();
+
+async function getAppName(appId: string): Promise<string> {
+  const cached = appNameCache.get(appId);
+  if (cached !== undefined) return cached;
+
+  let name = `Unknown App ${appId}`;
+  try {
+    const res = await fetch(
+      `https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic`,
+    );
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!res.ok || !contentType.includes("application/json")) {
+      throw new Error(
+        `Steam Store API returned ${res.status} ${res.statusText} (${contentType})`,
+      );
+    }
+    const data = await res.json();
+    const entry = data[appId];
+    if (entry?.success && entry.data?.name) {
+      name = entry.data.name;
+    } else {
+      console.warn(`No app name found for appid ${appId}, using fallback.`);
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch app name for appid ${appId}:`, err);
+  }
+
+  appNameCache.set(appId, name);
+  return name;
+}
 
 export async function exportAll() {
   for (const clipsPath of config.clipPaths) {
@@ -35,7 +57,7 @@ export async function exportSingleEntry(
   for (const clipPath of Deno.readDirSync(videoPath)) {
     const inputDirectory = path.join(videoPath, clipPath.name);
 
-    const appName = appIds[clipPath.name.split("_")[1]];
+    const appName = await getAppName(clipPath.name.split("_")[1]);
     const outputFileName = clipName.replace(
       clipNameRegex,
       `${appName} ${clipDestinationPattern}.mp4`,
